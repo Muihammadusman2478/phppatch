@@ -87,8 +87,6 @@ fi
 cat <<'NOTE'
 
 *An older upstream version may contain vendor backports.
-Confirm its full package revision with the vendor before concluding
-that it is unpatched. Confirm PHP-FPM restarted after patch installation.
 NOTE
 EOF
 
