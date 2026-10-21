@@ -75,7 +75,7 @@ if (( elts_found )); then
   cat <<'NOTICE'
 
 ELTS: Extended Long Term Support.
-For deprecated PHP versions, Cloudways is leveraging its ELTS
+For deprecated/ELTS PHP versions, Cloudways is leveraging its ELTS
 partnerships to help maintain security coverage and address
 vulnerabilities where official patches may not be available.
 
