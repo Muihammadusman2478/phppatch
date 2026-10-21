@@ -1,0 +1,95 @@
+bash <<'EOF'
+os=$(cat /etc/debian_version)
+elts_found=0
+rows=$(mktemp)
+trap 'rm -f "$rows"' EXIT
+
+printf 'Debian OS|PHP-FPM|Installed PHP|Fixed PHP|Result\n' > "$rows"
+
+while read -r package version; do
+  package=${package%%:*}
+  branch=${package#php}
+  branch=${branch%-fpm}
+  current=${version#*:}
+  current=${current%%[-+~]*}
+
+  case "$branch" in
+    8.5) fixed=8.5.12 ;;
+    8.4) fixed=8.4.27 ;;
+    8.3) fixed=8.3.36 ;;
+    8.2) fixed=8.2.35 ;;
+    5.*|7.*|8.0|8.1)
+      fixed="Vendor/ELTS"
+      status="Awaiting vendor confirmation"
+      elts_found=1
+      ;;
+    *)
+      fixed="Unknown"
+      status="Check vendor advisory"
+      ;;
+  esac
+
+  if [[ "$fixed" != "Vendor/ELTS" && "$fixed" != "Unknown" ]]; then
+    if dpkg --compare-versions "$current" ge "$fixed"; then
+      status="Meets upstream fixed version"
+    else
+      status="Below upstream fixed version*"
+    fi
+  fi
+
+  printf '%s|%s|%s|%s|%s\n' \
+    "$os" "$package" "$current" "$fixed" "$status" >> "$rows"
+done < <(
+  dpkg-query -W -f='${Package} ${Version} ${Status}\n' 'php*-fpm' 2>/dev/null |
+  awk '$3=="install" && $4=="ok" && $5=="installed" {print $1, $2}'
+)
+
+awk -F '|' '
+{
+  for (i=1; i<=NF; i++) {
+    cell[NR,i]=$i
+    if (length($i)>width[i]) width[i]=length($i)
+  }
+  columns=NF
+}
+END {
+  for (r=1; r<=NR; r++) {
+    printf "|"
+    for (i=1; i<=columns; i++)
+      printf " %-*s |", width[i], cell[r,i]
+    print ""
+    if (r==1) {
+      printf "|"
+      for (i=1; i<=columns; i++) {
+        for (j=0; j<width[i]+2; j++) printf "-"
+        printf "|"
+      }
+      print ""
+    }
+  }
+}' "$rows"
+
+printf '\nCloudways will apply the security patches.\n'
+
+if (( elts_found )); then
+  cat <<'NOTICE'
+
+ELTS: Extended Long Term Support.
+For deprecated PHP versions, Cloudways is leveraging its ELTS
+partnerships to help maintain security coverage and address
+vulnerabilities where official patches may not be available.
+
+Customers will receive further updates via email, and the Cloudways
+status page will be updated as new information becomes available.
+NOTICE
+fi
+
+cat <<'NOTE'
+
+*An older upstream version may contain vendor backports.
+Confirm its full package revision with the vendor before concluding
+that it is unpatched. Confirm PHP-FPM restarted after patch installation.
+NOTE
+EOF
+
+
